@@ -1,3 +1,4 @@
+/vendor/
 node_modules
 dist
 .DS_Store
@@ -6,4 +7,7 @@ coverage
 .env
 .env.*
 !.env.example
+.phpunit.result.cache
+.phpstan.cache
 API.md
+BLUEPRINT.md

@@ -1,2 +1,9 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Git Attributes for Composer Distribution Archive
+/tests export-ignore
+/.github export-ignore
+/phpstan.neon export-ignore
+/phpunit.xml export-ignore
+/.gitignore export-ignore
+/.gitattributes export-ignore
+.phpunit.result.cache export-ignore
+.phpstan.cache export-ignore

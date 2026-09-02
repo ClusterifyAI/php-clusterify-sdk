@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Clusterify\DTO\Common;
+
+/**
+ * Pagination metadata returned by paginated API endpoints.
+ */
+final readonly class Pagination
+{
+    /**
+     * @param int $page Current 1-based page number
+     * @param int $limit Max items per page
+     * @param int $totalItems Total items available across all pages
+     * @param int $totalPages Total number of pages
+     */
+    public function __construct(
+        public int $page,
+        public int $limit,
+        public int $totalItems,
+        public int $totalPages
+    ) {}
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return new self(
+            page: (int) ($data['page'] ?? 1),
+            limit: (int) ($data['limit'] ?? 20),
+            totalItems: (int) ($data['total_items'] ?? 0),
+            totalPages: (int) ($data['total_pages'] ?? 1)
+        );
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    public function toArray(): array
+    {
+        return [
+            'page' => $this->page,
+            'limit' => $this->limit,
+            'total_items' => $this->totalItems,
+            'total_pages' => $this->totalPages,
+        ];
+    }
+}
