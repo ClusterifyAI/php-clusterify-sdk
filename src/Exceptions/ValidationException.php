@@ -20,13 +20,15 @@ class ValidationException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'Validation failed for request payload.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 400
     ) {
-        parent::__construct($message, 'VALIDATION_ERROR', 400, $details, $previous);
+        parent::__construct($message, 'VALIDATION_ERROR', $statusCode, $details, $previous);
 
         $this->errors = isset($details['errors']) && is_array($details['errors'])
             ? $details['errors']

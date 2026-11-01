@@ -16,13 +16,15 @@ class AuthenticationException extends ClientException
      * @param string $errorCode
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'Authentication failed. Please verify your public and secret keys.',
         string $errorCode = 'INVALID_API_KEYS',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 401
     ) {
-        parent::__construct($message, $errorCode, 401, $details, $previous);
+        parent::__construct($message, $errorCode, $statusCode, $details, $previous);
     }
 }

@@ -6,7 +6,6 @@ namespace Clusterify;
 
 use Clusterify\Auth\AuthMethod;
 use Clusterify\Auth\Credentials;
-use Clusterify\Http\HttpClientInterface;
 use Clusterify\Http\Middleware\LoggingMiddleware;
 use Clusterify\Http\Middleware\MiddlewareInterface;
 use Clusterify\Http\Middleware\RetryMiddleware;
@@ -17,6 +16,7 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Log\LoggerInterface;
+use SensitiveParameter;
 
 /**
  * Fluent builder for configuring and instantiating a ClusterifyClient.
@@ -45,6 +45,7 @@ final class ClusterifyClientBuilder
      */
     public function withCredentials(
         string $publicKey,
+        #[SensitiveParameter]
         string $secretKey,
         AuthMethod $authMethod = AuthMethod::CustomHeaders
     ): self {
@@ -54,27 +55,45 @@ final class ClusterifyClientBuilder
 
     /**
      * Set custom API Base URL.
+     *
+     * @throws InvalidArgumentException
      */
     public function withBaseUrl(string $baseUrl): self
     {
+        if (trim($baseUrl) === '') {
+            throw new InvalidArgumentException('Base URL must not be empty.');
+        }
+
         $this->baseUrl = $baseUrl;
         return $this;
     }
 
     /**
      * Set request timeout in milliseconds.
+     *
+     * @throws InvalidArgumentException
      */
     public function withTimeout(int $timeoutMs): self
     {
+        if ($timeoutMs <= 0) {
+            throw new InvalidArgumentException('Request timeout (timeoutMs) must be greater than 0.');
+        }
+
         $this->timeoutMs = $timeoutMs;
         return $this;
     }
 
     /**
      * Set connection timeout in milliseconds.
+     *
+     * @throws InvalidArgumentException
      */
     public function withConnectTimeout(int $connectTimeoutMs): self
     {
+        if ($connectTimeoutMs <= 0) {
+            throw new InvalidArgumentException('Connection timeout (connectTimeoutMs) must be greater than 0.');
+        }
+
         $this->connectTimeoutMs = $connectTimeoutMs;
         return $this;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Clusterify\Http;
 
+use Clusterify\Support\Payload;
 use Psr\Http\Message\ResponseInterface;
 
 /**
@@ -29,7 +30,9 @@ final readonly class Response
      */
     public function isSuccess(): bool
     {
-        return $this->statusCode >= 200 && $this->statusCode < 300 && ($this->payload['success'] ?? true) === true;
+        return $this->statusCode >= 200
+            && $this->statusCode < 300
+            && Payload::bool($this->payload, 'success', true);
     }
 
     /**
@@ -39,9 +42,7 @@ final readonly class Response
      */
     public function getData(): array
     {
-        /** @var array<string, mixed> $data */
-        $data = $this->payload['data'] ?? [];
-        return $data;
+        return Payload::map($this->payload, 'data');
     }
 
     /**
@@ -49,8 +50,6 @@ final readonly class Response
      */
     public function getMessage(): ?string
     {
-        return isset($this->payload['message']) && is_string($this->payload['message'])
-            ? $this->payload['message']
-            : null;
+        return Payload::nullableString($this->payload, 'message');
     }
 }

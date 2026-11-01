@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Profile;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Profile and subscription plan response envelope.
  */
-final readonly class ProfileResponse
+final readonly class ProfileResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -25,22 +28,25 @@ final readonly class ProfileResponse
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
-        /** @var array<string, mixed> $profileNode */
-        $profileNode = $dataNode['profile'] ?? [];
-        /** @var array<string, mixed> $planNode */
-        $planNode = $dataNode['plan'] ?? [];
+        $dataNode = Payload::unwrapData($data);
+        $profileNode = Payload::map($dataNode, 'profile');
+        $planNode = Payload::map($dataNode, 'plan');
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
+            success: Payload::bool($data, 'success', true),
             profile: ProfileData::fromArray($profileNode),
             plan: PlanData::fromArray($planNode)
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     success: bool,
+     *     data: array{
+     *         profile: array<string, string|null>,
+     *         plan: array<string, mixed>
+     *     }
+     * }
      */
     public function toArray(): array
     {
@@ -51,5 +57,13 @@ final readonly class ProfileResponse
                 'plan' => $this->plan->toArray(),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

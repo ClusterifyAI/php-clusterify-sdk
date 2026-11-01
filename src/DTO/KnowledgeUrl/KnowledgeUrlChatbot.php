@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Minimal chatbot reference returned with URL knowledge queries.
  */
-final readonly class KnowledgeUrlChatbot
+final readonly class KnowledgeUrlChatbot implements JsonSerializable
 {
     /**
      * @param int $id Chatbot ID
@@ -24,13 +27,13 @@ final readonly class KnowledgeUrlChatbot
     public static function fromArray(array $data): self
     {
         return new self(
-            id: (int) ($data['id'] ?? 0),
-            domain: (string) ($data['domain'] ?? '')
+            id: Payload::int($data, 'id', 0),
+            domain: Payload::string($data, 'domain', '')
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{id: int, domain: string}
      */
     public function toArray(): array
     {
@@ -38,5 +41,13 @@ final readonly class KnowledgeUrlChatbot
             'id' => $this->id,
             'domain' => $this->domain,
         ];
+    }
+
+    /**
+     * @return array{id: int, domain: string}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

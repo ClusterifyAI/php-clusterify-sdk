@@ -42,4 +42,21 @@ final readonly class Request
             options: $this->options
         );
     }
+
+    /**
+     * Return new Request instance with merged HTTP headers.
+     *
+     * @param array<string, string> $headers
+     */
+    public function withHeaders(array $headers): self
+    {
+        return new self(
+            method: $this->method,
+            path: $this->path,
+            queryParams: $this->queryParams,
+            body: $this->body,
+            headers: array_merge($this->headers, $headers),
+            options: $this->options
+        );
+    }
 }

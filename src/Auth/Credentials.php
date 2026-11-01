@@ -5,21 +5,27 @@ declare(strict_types=1);
 namespace Clusterify\Auth;
 
 use InvalidArgumentException;
+use SensitiveParameter;
 
 /**
  * Immutable credentials container holding Clusterify API public and secret keys.
- * Implements __debugInfo to prevent accidental leakage in stack traces and logs.
+ * Implements __debugInfo and #[\SensitiveParameter] to prevent accidental leakage in stack traces and logs.
  */
 final readonly class Credentials
 {
+    public string $publicKey;
+    public string $secretKey;
+
     /**
      * @param string $publicKey Tenant public key (e.g. 'pk_live_...')
      * @param string $secretKey Tenant secret key (e.g. 'sk_live_...')
      * @param AuthMethod $authMethod Authentication method to use in HTTP requests
+     * @throws InvalidArgumentException
      */
     public function __construct(
-        public string $publicKey,
-        public string $secretKey,
+        string $publicKey,
+        #[SensitiveParameter]
+        string $secretKey,
         public AuthMethod $authMethod = AuthMethod::CustomHeaders
     ) {
         $cleanPublic = trim($publicKey);
@@ -32,6 +38,17 @@ final readonly class Credentials
         if ($cleanSecret === '') {
             throw new InvalidArgumentException('Clusterify secret key must not be empty.');
         }
+
+        if (strpbrk($cleanPublic, "\r\n\0") !== false) {
+            throw new InvalidArgumentException('Clusterify public key contains invalid control characters.');
+        }
+
+        if (strpbrk($cleanSecret, "\r\n\0") !== false) {
+            throw new InvalidArgumentException('Clusterify secret key contains invalid control characters.');
+        }
+
+        $this->publicKey = $cleanPublic;
+        $this->secretKey = $cleanSecret;
     }
 
     /**
@@ -59,7 +76,7 @@ final readonly class Credentials
     /**
      * Obfuscate secret key when dumping or inspecting the object.
      *
-     * @return array<string, string>
+     * @return array{publicKey: string, secretKey: string, authMethod: string}
      */
     public function __debugInfo(): array
     {

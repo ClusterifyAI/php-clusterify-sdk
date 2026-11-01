@@ -16,13 +16,15 @@ class AuthorizationException extends ClientException
      * @param string $errorCode
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'Access forbidden. Please check your account status.',
         string $errorCode = 'API_KEY_DISABLED',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 403
     ) {
-        parent::__construct($message, $errorCode, 403, $details, $previous);
+        parent::__construct($message, $errorCode, $statusCode, $details, $previous);
     }
 }

@@ -31,4 +31,24 @@ final class UrlNormalizerTest extends TestCase
         $this->expectExceptionMessage("URL host 'otherdomain.com' does not match");
         UrlNormalizer::normalize('https://otherdomain.com/docs', 'https://example.com');
     }
+
+    public function testThrowsOnPortMismatch(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('URL port');
+        UrlNormalizer::normalize('http://localhost:8080/docs', 'http://localhost:3000');
+    }
+
+    public function testThrowsOnDangerousScheme(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Unsupported URL scheme 'javascript'");
+        UrlNormalizer::normalize('javascript:alert(1)', 'https://example.com');
+    }
+
+    public function testThrowsOnEmptyUrlOrPath(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        UrlNormalizer::normalize('   ', 'https://example.com');
+    }
 }

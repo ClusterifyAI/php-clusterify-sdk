@@ -8,12 +8,14 @@ use Clusterify\Auth\AuthMethod;
 use Clusterify\Auth\Credentials;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
+use SensitiveParameter;
 
 final class CredentialsTest extends TestCase
 {
-    public function testConstructWithValidKeys(): void
+    public function testConstructWithValidKeysAndTrimsOuterWhitespace(): void
     {
-        $creds = new Credentials('pk_live_12345678', 'sk_live_87654321');
+        $creds = new Credentials("  pk_live_12345678  \n", "  sk_live_87654321\r\n");
         $this->assertSame('pk_live_12345678', $creds->publicKey);
         $this->assertSame('sk_live_87654321', $creds->secretKey);
         $this->assertSame(AuthMethod::CustomHeaders, $creds->authMethod);
@@ -31,6 +33,22 @@ final class CredentialsTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Clusterify secret key must not be empty.');
         new Credentials('pk_live_123', '');
+    }
+
+    public function testConstructThrowsOnHeaderInjectionControlCharacters(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('contains invalid control characters');
+        new Credentials('pk_live_123', "sk_live_123\r\nEvil-Header: injected");
+    }
+
+    public function testSecretKeyHasSensitiveParameterAttribute(): void
+    {
+        $ref = new ReflectionMethod(Credentials::class, '__construct');
+        $secretParam = $ref->getParameters()[1];
+        $attrs = $secretParam->getAttributes(SensitiveParameter::class);
+
+        $this->assertCount(1, $attrs);
     }
 
     public function testToHeadersCustomHeaders(): void

@@ -9,7 +9,7 @@ use Clusterify\DTO\KnowledgeUrl\BatchUpsertUrlResponse;
 use Clusterify\DTO\KnowledgeUrl\UpsertUrlRequest;
 use DirectoryIterator;
 use InvalidArgumentException;
-use SplFileInfo;
+use RuntimeException;
 
 /**
  * High-level utility to scan local documentation directories and synchronize markdown documents with Clusterify.
@@ -17,11 +17,13 @@ use SplFileInfo;
 final class MarkdownSyncHelper
 {
     /**
-     * Scan a directory recursively for markdown files (.md, .markdown).
+     * Scan a directory recursively for markdown files (.md, .markdown) in deterministic route order.
      *
      * @param string $directoryPath Path to the local documentation directory
      * @param string $baseRoute Optional base route prefix (e.g. '/docs')
      * @return list<array{path: string, route: string, title: string, content: string}>
+     * @throws InvalidArgumentException
+     * @throws RuntimeException
      */
     public static function scanDirectory(string $directoryPath, string $baseRoute = ''): array
     {
@@ -36,6 +38,11 @@ final class MarkdownSyncHelper
 
         $results = [];
         self::scanRecursive($realDir, $realDir, $baseRoute, $results);
+
+        usort(
+            $results,
+            static fn(array $a, array $b): int => strcmp($a['route'], $b['route'])
+        );
 
         return $results;
     }
@@ -69,7 +76,7 @@ final class MarkdownSyncHelper
             );
         }
 
-        if (empty($items)) {
+        if ($items === []) {
             return [];
         }
 
@@ -91,14 +98,22 @@ final class MarkdownSyncHelper
      */
     public static function extractTitle(string $content): string
     {
-        // Check YAML frontmatter title: "title: ..."
-        if (preg_match('/^---\s*\r?\n.*?\btitle:\s*(?:["\']([^"\']+)["\']|([^\r\n]+)).*?\r?\n---/s', $content, $matches)) {
-            $extracted = !empty($matches[1]) ? $matches[1] : ($matches[2] ?? '');
-            return trim($extracted, " \"'");
+        // Isolate YAML frontmatter block strictly at the start of the document
+        if (preg_match('/\A---\h*\r?\n(.*?)\r?\n---\h*(?:\r?\n|\z)/s', $content, $frontmatterMatch) === 1) {
+            $frontmatter = $frontmatterMatch[1];
+            if (preg_match('/^\h*title:\h*(?:"([^"]+)"|\'([^\']+)\'|([^\r\n#]+))\h*$/m', $frontmatter, $titleMatch) === 1) {
+                $extracted = $titleMatch[1] !== ''
+                    ? $titleMatch[1]
+                    : (($titleMatch[2] ?? '') !== '' ? $titleMatch[2] : ($titleMatch[3] ?? ''));
+                $trimmed = trim($extracted);
+                if ($trimmed !== '') {
+                    return $trimmed;
+                }
+            }
         }
 
         // Check first H1 heading: "# My Title"
-        if (preg_match('/^#\s+(.+)$/m', $content, $matches)) {
+        if (preg_match('/^#\s+(.+)$/m', $content, $matches) === 1) {
             return trim($matches[1]);
         }
 
@@ -129,7 +144,11 @@ final class MarkdownSyncHelper
                 $ext = strtolower($item->getExtension());
                 if ($ext === 'md' || $ext === 'markdown') {
                     $filePath = $item->getPathname();
-                    $content = (string) file_get_contents($filePath);
+                    $content = @file_get_contents($filePath);
+                    if ($content === false) {
+                        throw new RuntimeException("Failed to read markdown file: {$filePath}");
+                    }
+
                     $relative = substr($filePath, strlen($rootDir));
                     $route = self::filePathToRoute($relative, $baseRoute);
                     $title = self::extractTitle($content);
@@ -154,7 +173,7 @@ final class MarkdownSyncHelper
         $clean = preg_replace('/(\/index)$/i', '', (string) $clean);
         $clean = str_replace('\\', '/', (string) $clean);
 
-        $cleanPath = trim((string) $clean, '/');
+        $cleanPath = trim($clean, '/');
         $cleanBase = trim($baseRoute, '/');
 
         if ($cleanPath === '') {

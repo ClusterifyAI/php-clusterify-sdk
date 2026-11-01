@@ -6,6 +6,7 @@ namespace Clusterify;
 
 use Clusterify\Auth\Credentials;
 use Clusterify\Support\RetryPolicy;
+use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -14,7 +15,7 @@ use Psr\Log\LoggerInterface;
 final readonly class Configuration
 {
     public const DEFAULT_BASE_URL = 'https://api.clusterify.ai';
-    public const SDK_VERSION = '1.0.0';
+    public const SDK_VERSION = '1.1.0';
 
     /**
      * @param Credentials $credentials Authentication credentials
@@ -25,6 +26,7 @@ final readonly class Configuration
      * @param LoggerInterface|null $logger Optional PSR-3 logger
      * @param array<string, string> $defaultHeaders Custom default headers for all requests
      * @param string $userAgent User Agent header string
+     * @throws InvalidArgumentException
      */
     public function __construct(
         public Credentials $credentials,
@@ -35,13 +37,25 @@ final readonly class Configuration
         public ?LoggerInterface $logger = null,
         public array $defaultHeaders = [],
         public string $userAgent = 'clusterify-chatbot-sdk/' . self::SDK_VERSION
-    ) {}
+    ) {
+        if (trim($baseUrl) === '') {
+            throw new InvalidArgumentException('Base URL must not be empty.');
+        }
+
+        if ($timeoutMs <= 0) {
+            throw new InvalidArgumentException('Request timeout (timeoutMs) must be greater than 0.');
+        }
+
+        if ($connectTimeoutMs <= 0) {
+            throw new InvalidArgumentException('Connection timeout (connectTimeoutMs) must be greater than 0.');
+        }
+    }
 
     /**
      * Returns sanitized base URL without trailing slashes.
      */
     public function getCleanBaseUrl(): string
     {
-        return rtrim($this->baseUrl, '/');
+        return rtrim(trim($this->baseUrl), '/');
     }
 }

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Ping;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Healthcheck and ping response DTO.
  */
-final readonly class PingResponse
+final readonly class PingResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -28,15 +31,15 @@ final readonly class PingResponse
     public static function fromArray(array $data): self
     {
         return new self(
-            success: (bool) ($data['success'] ?? true),
-            status: (string) ($data['status'] ?? 'unknown'),
-            authenticated: (bool) ($data['authenticated'] ?? false),
-            timestamp: (string) ($data['timestamp'] ?? '')
+            success: Payload::bool($data, 'success', true),
+            status: Payload::string($data, 'status', 'unknown'),
+            authenticated: Payload::bool($data, 'authenticated', false),
+            timestamp: Payload::string($data, 'timestamp', '')
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{success: bool, status: string, authenticated: bool, timestamp: string}
      */
     public function toArray(): array
     {
@@ -46,5 +49,13 @@ final readonly class PingResponse
             'authenticated' => $this->authenticated,
             'timestamp' => $this->timestamp,
         ];
+    }
+
+    /**
+     * @return array{success: bool, status: string, authenticated: bool, timestamp: string}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

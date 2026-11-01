@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Clusterify\Support;
 
+use Clusterify\Exceptions\NetworkException;
+use InvalidArgumentException;
+use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
@@ -25,7 +28,23 @@ final readonly class RetryPolicy
         public int $maxDelayMs = 10000,
         public float $jitter = 0.25,
         public array $retryableStatusCodes = [429, 500, 502, 503, 504]
-    ) {}
+    ) {
+        if ($maxRetries < 0) {
+            throw new InvalidArgumentException('RetryPolicy maxRetries must be >= 0.');
+        }
+
+        if ($baseDelayMs < 0) {
+            throw new InvalidArgumentException('RetryPolicy baseDelayMs must be >= 0.');
+        }
+
+        if ($maxDelayMs < 0) {
+            throw new InvalidArgumentException('RetryPolicy maxDelayMs must be >= 0.');
+        }
+
+        if ($jitter < 0.0 || $jitter > 1.0) {
+            throw new InvalidArgumentException('RetryPolicy jitter must be between 0.0 and 1.0.');
+        }
+    }
 
     /**
      * Parse the RFC 7231 'Retry-After' header from an HTTP response.
@@ -36,7 +55,7 @@ final readonly class RetryPolicy
      */
     public static function parseRetryAfter(ResponseInterface $response): ?int
     {
-        $header = $response->getHeaderLine('Retry-After');
+        $header = trim($response->getHeaderLine('Retry-After'));
         if ($header === '') {
             return null;
         }
@@ -67,12 +86,11 @@ final readonly class RetryPolicy
             return false;
         }
 
-        if ($exception !== null && $statusCode === null) {
-            // Network error (timeout, connection reset, DNS failure)
-            return true;
+        if ($statusCode !== null) {
+            return in_array($statusCode, $this->retryableStatusCodes, true);
         }
 
-        if ($statusCode !== null && in_array($statusCode, $this->retryableStatusCodes, true)) {
+        if ($exception instanceof NetworkException || $exception instanceof ClientExceptionInterface) {
             return true;
         }
 
@@ -84,26 +102,37 @@ final readonly class RetryPolicy
      *
      * @param int $attempt Attempt number (1-based)
      * @param ResponseInterface|null $response Optional response to check Retry-After header
+     * @param int|null $retryAfterSeconds Optional pre-parsed Retry-After value in seconds
      * @return int Milliseconds to sleep
      */
-    public function getDelayMs(int $attempt, ?ResponseInterface $response = null): int
-    {
-        if ($response !== null) {
-            $retryAfterSeconds = self::parseRetryAfter($response);
-            if ($retryAfterSeconds !== null) {
-                return min($retryAfterSeconds * 1000, $this->maxDelayMs);
+    public function getDelayMs(
+        int $attempt,
+        ?ResponseInterface $response = null,
+        ?int $retryAfterSeconds = null
+    ): int {
+        $resolvedRetryAfter = $retryAfterSeconds ?? ($response !== null ? self::parseRetryAfter($response) : null);
+        if ($resolvedRetryAfter !== null) {
+            return min(max(0, $resolvedRetryAfter) * 1000, $this->maxDelayMs);
+        }
+
+        // Exponential backoff: baseDelayMs * 2^(attempt - 1), capped before jitter to prevent overflow & thundering herd
+        $exponent = min(max(0, $attempt - 1), 30);
+        $cappedDelay = min($this->maxDelayMs, $this->baseDelayMs * (1 << $exponent));
+
+        if ($this->jitter > 0.0 && $cappedDelay > 0) {
+            $jitterRange = (int) round($cappedDelay * $this->jitter);
+            if ($jitterRange > 0) {
+                $minDelay = max(0, $cappedDelay - $jitterRange);
+                $maxDelay = min($this->maxDelayMs, $cappedDelay + $jitterRange);
+                $spread = $maxDelay - $minDelay;
+                if ($spread > 0) {
+                    return $minDelay + random_int(0, $spread);
+                }
+
+                return $minDelay;
             }
         }
 
-        // Exponential backoff: baseDelayMs * 2^(attempt - 1)
-        $delay = $this->baseDelayMs * (2 ** ($attempt - 1));
-
-        // Add randomized jitter
-        if ($this->jitter > 0) {
-            $jitterRange = $delay * $this->jitter;
-            $delay += (int) mt_rand((int) -$jitterRange, (int) $jitterRange);
-        }
-
-        return max(0, min((int) $delay, $this->maxDelayMs));
+        return max(0, $cappedDelay);
     }
 }

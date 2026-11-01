@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Installation;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Installation snippet and guides response envelope.
  */
-final readonly class InstallationResponse
+final readonly class InstallationResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -33,24 +36,32 @@ final readonly class InstallationResponse
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
-        /** @var array<string, mixed> $infoNode */
-        $infoNode = $dataNode['information'] ?? [];
+        $dataNode = Payload::unwrapData($data);
+        $infoNode = Payload::map($dataNode, 'information');
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
-            publicUuid: (string) ($dataNode['public_uuid'] ?? ''),
-            domain: (string) ($dataNode['domain'] ?? ''),
-            isEnabled: (bool) ($dataNode['is_enabled'] ?? false),
-            hasChatbot: (bool) ($dataNode['has_chatbot'] ?? false),
-            htmlSnippet: (string) ($dataNode['html_snippet'] ?? ''),
+            success: Payload::bool($data, 'success', true),
+            publicUuid: Payload::string($dataNode, 'public_uuid', ''),
+            domain: Payload::string($dataNode, 'domain', ''),
+            isEnabled: Payload::bool($dataNode, 'is_enabled', false),
+            hasChatbot: Payload::bool($dataNode, 'has_chatbot', false),
+            htmlSnippet: Payload::string($dataNode, 'html_snippet', ''),
             information: InstallationInfo::fromArray($infoNode)
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     success: bool,
+     *     data: array{
+     *         public_uuid: string,
+     *         domain: string,
+     *         is_enabled: bool,
+     *         has_chatbot: bool,
+     *         html_snippet: string,
+     *         information: array<string, mixed>
+     *     }
+     * }
      */
     public function toArray(): array
     {
@@ -65,5 +76,13 @@ final readonly class InstallationResponse
                 'information' => $this->information->toArray(),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

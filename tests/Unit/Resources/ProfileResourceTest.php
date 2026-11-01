@@ -28,6 +28,8 @@ final class ProfileResourceTest extends TestCase
                     'name' => 'PROFESSIONAL Plan',
                     'is_url_knowledge_allowed' => true,
                     'restrictions' => [
+                        'api_calls_per_minute' => 120,
+                        'api_calls_per_day' => 50000,
                         'max_knowledge_general_sections' => 25,
                         'max_knowledge_general_section_length' => 10000,
                         'max_knowledge_urls' => 1000,
@@ -48,8 +50,13 @@ final class ProfileResourceTest extends TestCase
         $this->assertSame(2, $res->plan->id);
         $this->assertSame('PROFESSIONAL Plan', $res->plan->name);
         $this->assertTrue($res->plan->isUrlKnowledgeAllowed);
+        $this->assertSame(120, $res->plan->restrictions->apiCallsPerMinute);
+        $this->assertSame(50000, $res->plan->restrictions->apiCallsPerDay);
         $this->assertSame(25, $res->plan->restrictions->maxKnowledgeGeneralSections);
         $this->assertSame(1000, $res->plan->restrictions->maxKnowledgeUrls);
         $this->assertTrue($mockHttp->recordedRequests[0]->options?->noCache);
+
+        $encoded = json_encode($res, JSON_THROW_ON_ERROR);
+        $this->assertStringContainsString('"api_calls_per_minute":120', $encoded);
     }
 }

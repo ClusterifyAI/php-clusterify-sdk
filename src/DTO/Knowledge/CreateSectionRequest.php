@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Knowledge;
 
+use JsonSerializable;
+
 /**
  * Request payload for creating a new simple knowledge base section.
  */
-final readonly class CreateSectionRequest
+final readonly class CreateSectionRequest implements JsonSerializable
 {
     /**
      * @param string $title Section title (max 100 characters)
@@ -21,7 +23,7 @@ final readonly class CreateSectionRequest
     ) {}
 
     /**
-     * @return array<string, mixed>
+     * @return array{title: string, content: string, is_open: bool}
      */
     public function toArray(): array
     {
@@ -30,5 +32,13 @@ final readonly class CreateSectionRequest
             'content' => $this->content,
             'is_open' => $this->isOpen,
         ];
+    }
+
+    /**
+     * @return array{title: string, content: string, is_open: bool}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

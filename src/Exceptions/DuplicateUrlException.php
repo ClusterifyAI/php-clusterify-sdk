@@ -15,12 +15,14 @@ class DuplicateUrlException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'This URL is already registered under another ID.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 400
     ) {
-        parent::__construct($message, 'DUPLICATE_URL', 400, $details, $previous);
+        parent::__construct($message, 'DUPLICATE_URL', $statusCode, $details, $previous);
     }
 }

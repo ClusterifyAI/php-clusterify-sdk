@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Installation;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Structured instructions and guides for deploying the chatbot.
  */
-final readonly class InstallationInfo
+final readonly class InstallationInfo implements JsonSerializable
 {
     /**
      * @param string $overview High-level embedding overview
@@ -29,34 +32,34 @@ final readonly class InstallationInfo
      */
     public static function fromArray(array $data): self
     {
-        /** @var list<array<string, mixed>> $rawGuides */
-        $rawGuides = $data['available_guides'] ?? [];
-        $availableGuides = array_values(array_map(
+        $rawGuides = Payload::listOfMaps($data, 'available_guides');
+        $availableGuides = array_map(
             static fn(array $guide): IntegrationGuide => IntegrationGuide::fromArray($guide),
             $rawGuides
-        ));
+        );
 
-        /** @var array<string, mixed> $rawAdmin */
-        $rawAdmin = $data['admin_guides'] ?? [];
+        $rawAdmin = Payload::map($data, 'admin_guides');
         $adminGuides = AdminGuides::fromArray($rawAdmin);
 
-        /** @var list<string> $verificationSteps */
-        $verificationSteps = array_values(array_map(
-            static fn(mixed $step): string => (string) $step,
-            $data['verification_steps'] ?? []
-        ));
+        $verificationSteps = Payload::listOfStrings($data, 'verification_steps');
 
         return new self(
-            overview: (string) ($data['overview'] ?? ''),
+            overview: Payload::string($data, 'overview', ''),
             availableGuides: $availableGuides,
             adminGuides: $adminGuides,
             verificationSteps: $verificationSteps,
-            securityNotice: (string) ($data['security_notice'] ?? '')
+            securityNotice: Payload::string($data, 'security_notice', '')
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     overview: string,
+     *     available_guides: list<array{platform: string, name: string, summary: string, doc_url: string}>,
+     *     admin_guides: array<string, string>,
+     *     verification_steps: list<string>,
+     *     security_notice: string
+     * }
      */
     public function toArray(): array
     {
@@ -67,5 +70,13 @@ final readonly class InstallationInfo
             'verification_steps' => $this->verificationSteps,
             'security_notice' => $this->securityNotice,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

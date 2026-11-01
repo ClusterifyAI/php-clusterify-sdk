@@ -16,14 +16,16 @@ class RateLimitExceededException extends ClientException
      * @param int|null $retryAfter Number of seconds to wait before retrying, if indicated by header/payload
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'API rate limit exceeded. Please throttle your requests.',
         protected readonly ?int $retryAfter = null,
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 429
     ) {
-        parent::__construct($message, 'RATE_LIMIT_EXCEEDED', 429, $details, $previous);
+        parent::__construct($message, 'RATE_LIMIT_EXCEEDED', $statusCode, $details, $previous);
     }
 
     /**

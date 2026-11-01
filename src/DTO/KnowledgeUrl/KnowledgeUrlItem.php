@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * URL-specific knowledge base entry item.
  */
-final readonly class KnowledgeUrlItem
+final readonly class KnowledgeUrlItem implements JsonSerializable
 {
     /**
      * @param int $id Record integer ID
@@ -40,21 +43,32 @@ final readonly class KnowledgeUrlItem
     public static function fromArray(array $data): self
     {
         return new self(
-            id: (int) ($data['id'] ?? 0),
-            userId: (int) ($data['user_id'] ?? 0),
-            chatbotId: (int) ($data['chatbot_id'] ?? 0),
-            url: (string) ($data['url'] ?? ''),
-            isEnabled: (bool) ($data['is_enabled'] ?? false),
-            content: (string) ($data['content'] ?? ''),
-            hasEmbedding: (bool) ($data['has_embedding'] ?? false),
-            embeddingAt: isset($data['embedding_at']) && is_string($data['embedding_at']) ? $data['embedding_at'] : null,
-            createdAt: isset($data['created_at']) && is_string($data['created_at']) ? $data['created_at'] : null,
-            modifiedAt: isset($data['modified_at']) && is_string($data['modified_at']) ? $data['modified_at'] : null
+            id: Payload::int($data, 'id', 0),
+            userId: Payload::int($data, 'user_id', 0),
+            chatbotId: Payload::int($data, 'chatbot_id', 0),
+            url: Payload::string($data, 'url', ''),
+            isEnabled: Payload::bool($data, 'is_enabled', false),
+            content: Payload::string($data, 'content', ''),
+            hasEmbedding: Payload::bool($data, 'has_embedding', false),
+            embeddingAt: Payload::nullableString($data, 'embedding_at'),
+            createdAt: Payload::nullableString($data, 'created_at'),
+            modifiedAt: Payload::nullableString($data, 'modified_at')
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     user_id: int,
+     *     chatbot_id: int,
+     *     url: string,
+     *     is_enabled: bool,
+     *     content: string,
+     *     has_embedding: bool,
+     *     embedding_at: string|null,
+     *     created_at: string|null,
+     *     modified_at: string|null
+     * }
      */
     public function toArray(): array
     {
@@ -70,5 +84,13 @@ final readonly class KnowledgeUrlItem
             'created_at' => $this->createdAt,
             'modified_at' => $this->modifiedAt,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

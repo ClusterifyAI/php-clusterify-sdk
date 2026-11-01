@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Knowledge;
 
+use JsonSerializable;
+
 /**
  * Request payload for updating an existing knowledge base section.
  */
-final readonly class UpdateSectionRequest
+final readonly class UpdateSectionRequest implements JsonSerializable
 {
     /**
      * @param string $id Target section ID
@@ -23,7 +25,7 @@ final readonly class UpdateSectionRequest
     ) {}
 
     /**
-     * @return array<string, mixed>
+     * @return array<string, string|bool>
      */
     public function toArray(): array
     {
@@ -42,5 +44,13 @@ final readonly class UpdateSectionRequest
         }
 
         return $payload;
+    }
+
+    /**
+     * @return array<string, string|bool>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

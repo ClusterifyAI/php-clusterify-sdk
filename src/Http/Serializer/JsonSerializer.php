@@ -24,7 +24,13 @@ final class JsonSerializer
         try {
             return json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         } catch (JsonException $e) {
-            throw new ClusterifyException('Failed to JSON-encode request payload: ' . $e->getMessage(), 'JSON_ENCODE_ERROR', null, [], $e);
+            throw new ClusterifyException(
+                'Failed to JSON-encode request payload: ' . $e->getMessage(),
+                'JSON_ENCODE_ERROR',
+                null,
+                [],
+                $e
+            );
         }
     }
 
@@ -42,11 +48,25 @@ final class JsonSerializer
         }
 
         try {
-            /** @var array<string, mixed> $decoded */
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
-            return $decoded;
         } catch (JsonException $e) {
-            throw new ClusterifyException('Failed to JSON-decode response body: ' . $e->getMessage(), 'JSON_DECODE_ERROR', null, [], $e);
+            throw new ClusterifyException(
+                'Failed to JSON-decode response body: ' . $e->getMessage(),
+                'JSON_DECODE_ERROR',
+                null,
+                [],
+                $e
+            );
         }
+
+        if (!is_array($decoded)) {
+            throw new ClusterifyException(
+                'Failed to JSON-decode response body: expected JSON object or array.',
+                'JSON_DECODE_ERROR'
+            );
+        }
+
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
     }
 }

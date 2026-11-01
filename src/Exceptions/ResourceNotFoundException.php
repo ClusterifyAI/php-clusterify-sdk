@@ -15,12 +15,14 @@ class ResourceNotFoundException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'The requested resource was not found.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 404
     ) {
-        parent::__construct($message, 'NOT_FOUND', 404, $details, $previous);
+        parent::__construct($message, 'NOT_FOUND', $statusCode, $details, $previous);
     }
 }

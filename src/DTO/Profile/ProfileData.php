@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Profile;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Tenant user profile details.
  */
-final readonly class ProfileData
+final readonly class ProfileData implements JsonSerializable
 {
     /**
      * @param string|null $name User full name (null if not provided)
@@ -28,15 +31,15 @@ final readonly class ProfileData
     public static function fromArray(array $data): self
     {
         return new self(
-            name: isset($data['name']) && is_string($data['name']) ? $data['name'] : null,
-            email: (string) ($data['email'] ?? ''),
-            country: isset($data['country']) && is_string($data['country']) ? $data['country'] : null,
-            timezone: isset($data['timezone']) && is_string($data['timezone']) ? $data['timezone'] : null
+            name: Payload::nullableString($data, 'name'),
+            email: Payload::string($data, 'email', ''),
+            country: Payload::nullableString($data, 'country'),
+            timezone: Payload::nullableString($data, 'timezone')
         );
     }
 
     /**
-     * @return array<string, string|null>
+     * @return array{name: string|null, email: string, country: string|null, timezone: string|null}
      */
     public function toArray(): array
     {
@@ -46,5 +49,13 @@ final readonly class ProfileData
             'country' => $this->country,
             'timezone' => $this->timezone,
         ];
+    }
+
+    /**
+     * @return array{name: string|null, email: string, country: string|null, timezone: string|null}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

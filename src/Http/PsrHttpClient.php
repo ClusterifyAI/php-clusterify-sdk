@@ -10,6 +10,8 @@ use Clusterify\Exceptions\Factory\ExceptionFactory;
 use Clusterify\Exceptions\NetworkException;
 use Clusterify\Http\Middleware\MiddlewareInterface;
 use Clusterify\Http\Serializer\JsonSerializer;
+use GuzzleHttp\Client as GuzzleClient;
+use GuzzleHttp\RequestOptions as GuzzleRequestOptions;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
 use Psr\Http\Client\ClientExceptionInterface;
@@ -35,7 +37,7 @@ final class PsrHttpClient implements HttpClientInterface
 
     /**
      * @param Configuration $configuration Client configuration
-     * @param ClientInterface|null $psrClient PSR-18 HTTP client (auto-discovered if null)
+     * @param ClientInterface|null $psrClient PSR-18 HTTP client (auto-configured Guzzle or PSR-18 discovered if null)
      * @param RequestFactoryInterface|null $requestFactory PSR-17 Request Factory (auto-discovered if null)
      * @param StreamFactoryInterface|null $streamFactory PSR-17 Stream Factory (auto-discovered if null)
      * @param list<MiddlewareInterface> $middlewares Middleware stack
@@ -47,7 +49,7 @@ final class PsrHttpClient implements HttpClientInterface
         ?StreamFactoryInterface $streamFactory = null,
         array $middlewares = []
     ) {
-        $this->psrClient = $psrClient ?? Psr18ClientDiscovery::find();
+        $this->psrClient = $psrClient ?? $this->createDefaultClient();
         $this->requestFactory = $requestFactory ?? Psr17FactoryDiscovery::findRequestFactory();
         $this->streamFactory = $streamFactory ?? Psr17FactoryDiscovery::findStreamFactory();
         $this->middlewares = $middlewares;
@@ -99,8 +101,61 @@ final class PsrHttpClient implements HttpClientInterface
      */
     public function send(Request $request): Response
     {
+        $preparedRequest = $this->prepareRequest($request);
         $pipeline = $this->buildPipeline();
-        return $pipeline($request);
+        return $pipeline($preparedRequest);
+    }
+
+    /**
+     * Create a default PSR-18 client honoring configured request and connection timeouts.
+     */
+    private function createDefaultClient(): ClientInterface
+    {
+        if (class_exists(GuzzleClient::class)) {
+            return new GuzzleClient([
+                GuzzleRequestOptions::TIMEOUT => $this->configuration->timeoutMs / 1000,
+                GuzzleRequestOptions::CONNECT_TIMEOUT => $this->configuration->connectTimeoutMs / 1000,
+                GuzzleRequestOptions::HTTP_ERRORS => false,
+            ]);
+        }
+
+        return Psr18ClientDiscovery::find();
+    }
+
+    /**
+     * Enrich the outgoing Request with default headers, authentication headers, and cache bypass query params
+     * before entering the middleware pipeline (ensuring LoggingMiddleware and custom middlewares see full context).
+     */
+    private function prepareRequest(Request $request): Request
+    {
+        $queryParams = $request->queryParams;
+        if ($request->options?->noCache === true) {
+            $queryParams['nocache'] = '1';
+        }
+
+        $headers = array_merge(
+            [
+                'Accept' => 'application/json',
+                'User-Agent' => $this->configuration->userAgent,
+            ],
+            $this->configuration->defaultHeaders,
+            $this->configuration->credentials->toHeaders(),
+            $request->headers,
+            $request->options?->headers ?? []
+        );
+
+        if ($request->body !== null) {
+            $headers['Content-Type'] = 'application/json';
+        }
+
+        return new Request(
+            method: strtoupper($request->method),
+            path: $request->path,
+            queryParams: $queryParams,
+            body: $request->body,
+            headers: $headers,
+            options: $request->options
+        );
     }
 
     /**
@@ -127,40 +182,21 @@ final class PsrHttpClient implements HttpClientInterface
      */
     private function executeHttpRequest(Request $request): Response
     {
-        // 1. Build Query Parameters
-        $queryParams = $request->queryParams;
-        if ($request->options?->noCache === true) {
-            $queryParams['nocache'] = '1';
-        }
-
-        // 2. Build URI
+        // 1. Build URI
         $url = $this->configuration->getCleanBaseUrl() . '/' . ltrim($request->path, '/');
-        if (!empty($queryParams)) {
-            $queryString = http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
+        if ($request->queryParams !== []) {
+            $queryString = http_build_query($request->queryParams, '', '&', PHP_QUERY_RFC3986);
             $url .= (str_contains($url, '?') ? '&' : '?') . $queryString;
         }
 
-        // 3. Create PSR-7 Request
+        // 2. Create PSR-7 Request & Attach Body/Headers
         $psrRequest = $this->requestFactory->createRequest($request->method, $url);
 
-        // 4. Attach Default & Auth Headers
-        $headers = array_merge(
-            [
-                'Accept' => 'application/json',
-                'User-Agent' => $this->configuration->userAgent,
-            ],
-            $this->configuration->defaultHeaders,
-            $this->configuration->credentials->toHeaders(),
-            $request->headers,
-            $request->options?->headers ?? []
-        );
-
-        if ($request->options?->noCache === true) {
-            $headers['x-no-cache'] = 'true';
-        }
-
+        $headers = $request->headers;
         if ($request->body !== null) {
-            $headers['Content-Type'] = 'application/json';
+            if (!isset($headers['Content-Type']) && !isset($headers['content-type'])) {
+                $headers['Content-Type'] = 'application/json';
+            }
             $bodyContent = JsonSerializer::encode($request->body);
             $psrRequest = $psrRequest->withBody($this->streamFactory->createStream($bodyContent));
         }
@@ -169,16 +205,24 @@ final class PsrHttpClient implements HttpClientInterface
             $psrRequest = $psrRequest->withHeader($name, $value);
         }
 
-        // 5. Send via PSR-18 Client
+        // 3. Send via PSR-18 Client (applying per-request timeout override when Guzzle is active)
         try {
-            $psrResponse = $this->psrClient->sendRequest($psrRequest);
+            if ($request->options?->timeoutMs !== null && $this->psrClient instanceof GuzzleClient) {
+                $psrResponse = $this->psrClient->send($psrRequest, [
+                    GuzzleRequestOptions::TIMEOUT => $request->options->timeoutMs / 1000,
+                    GuzzleRequestOptions::CONNECT_TIMEOUT => $this->configuration->connectTimeoutMs / 1000,
+                    GuzzleRequestOptions::HTTP_ERRORS => false,
+                ]);
+            } else {
+                $psrResponse = $this->psrClient->sendRequest($psrRequest);
+            }
         } catch (ClientExceptionInterface $e) {
             throw new NetworkException('HTTP request failed: ' . $e->getMessage(), $e);
         } catch (Throwable $e) {
             throw new NetworkException('Unexpected connection failure: ' . $e->getMessage(), $e);
         }
 
-        // 6. Handle & Parse Response
+        // 4. Handle & Parse Response
         return $this->handlePsrResponse($psrResponse);
     }
 
@@ -191,11 +235,19 @@ final class PsrHttpClient implements HttpClientInterface
     {
         $statusCode = $psrResponse->getStatusCode();
         $bodyString = (string) $psrResponse->getBody();
-        $payload = JsonSerializer::decode($bodyString);
 
         if ($statusCode >= 400) {
+            try {
+                $payload = JsonSerializer::decode($bodyString);
+            } catch (ClusterifyException) {
+                // Upstream gateways/CDNs (e.g. Nginx 502/503/504) may return HTML or plain text error bodies
+                $payload = [];
+            }
+
             throw ExceptionFactory::createFromResponse($statusCode, $payload, $psrResponse);
         }
+
+        $payload = JsonSerializer::decode($bodyString);
 
         return new Response(
             statusCode: $statusCode,

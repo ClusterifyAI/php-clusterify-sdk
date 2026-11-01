@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Clusterify\Http\Middleware;
 
+use Closure;
 use Clusterify\Exceptions\ClusterifyException;
 use Clusterify\Exceptions\RateLimitExceededException;
-use Clusterify\Exceptions\ServerException;
 use Clusterify\Http\Request;
 use Clusterify\Http\Response;
 use Clusterify\Support\RetryPolicy;
@@ -14,19 +14,19 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Retry middleware executing exponential backoff with jitter on rate limits (429) and transient 5xx errors.
+ * Retry middleware executing exponential backoff with jitter on rate limits (429), transient 5xx, and network errors.
  */
 final readonly class RetryMiddleware implements MiddlewareInterface
 {
     /**
      * @param RetryPolicy $retryPolicy
      * @param LoggerInterface|null $logger
-     * @param (callable(int): void)|null $sleeper Custom sleep function for unit tests (receives ms)
+     * @param (Closure(int): void)|null $sleeper Custom sleep function for unit tests (receives ms)
      */
     public function __construct(
         private RetryPolicy $retryPolicy,
         private ?LoggerInterface $logger = null,
-        private mixed $sleeper = null
+        private ?Closure $sleeper = null
     ) {}
 
     public function handle(Request $request, callable $next): Response
@@ -37,11 +37,11 @@ final readonly class RetryMiddleware implements MiddlewareInterface
             try {
                 $response = $next($request);
 
-                // If response is a retryable error status (e.g. 429 or 5xx) and we haven't exhausted attempts
+                // Support custom transport implementations that return >= 400 Response objects directly
                 if ($this->retryPolicy->shouldRetry($attempt, $response->statusCode)) {
                     $delayMs = $this->retryPolicy->getDelayMs($attempt, $response->psrResponse);
                     $this->logger?->warning("Clusterify API retry attempt {$attempt} after {$delayMs}ms (HTTP {$response->statusCode}) for {$request->method} {$request->path}");
-                    
+
                     $this->sleep($delayMs);
                     $attempt++;
                     continue;
@@ -52,7 +52,8 @@ final readonly class RetryMiddleware implements MiddlewareInterface
                 $statusCode = ($e instanceof ClusterifyException) ? $e->getStatusCode() : null;
 
                 if ($this->retryPolicy->shouldRetry($attempt, $statusCode, $e)) {
-                    $delayMs = $this->retryPolicy->getDelayMs($attempt);
+                    $retryAfterSeconds = ($e instanceof RateLimitExceededException) ? $e->getRetryAfter() : null;
+                    $delayMs = $this->retryPolicy->getDelayMs($attempt, retryAfterSeconds: $retryAfterSeconds);
                     $this->logger?->warning("Clusterify API retry attempt {$attempt} after {$delayMs}ms due to {$e->getMessage()} for {$request->method} {$request->path}");
 
                     $this->sleep($delayMs);
@@ -74,7 +75,7 @@ final readonly class RetryMiddleware implements MiddlewareInterface
             return;
         }
 
-        if ($this->sleeper !== null && is_callable($this->sleeper)) {
+        if ($this->sleeper !== null) {
             ($this->sleeper)($milliseconds);
             return;
         }

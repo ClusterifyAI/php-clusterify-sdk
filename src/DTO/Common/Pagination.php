@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Common;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Pagination metadata returned by paginated API endpoints.
  */
-final readonly class Pagination
+final readonly class Pagination implements JsonSerializable
 {
     /**
      * @param int $page Current 1-based page number
@@ -28,15 +31,15 @@ final readonly class Pagination
     public static function fromArray(array $data): self
     {
         return new self(
-            page: (int) ($data['page'] ?? 1),
-            limit: (int) ($data['limit'] ?? 20),
-            totalItems: (int) ($data['total_items'] ?? 0),
-            totalPages: (int) ($data['total_pages'] ?? 1)
+            page: Payload::int($data, 'page', 1),
+            limit: Payload::int($data, 'limit', 20),
+            totalItems: Payload::int($data, 'total_items', 0),
+            totalPages: Payload::int($data, 'total_pages', 1)
         );
     }
 
     /**
-     * @return array<string, int>
+     * @return array{page: int, limit: int, total_items: int, total_pages: int}
      */
     public function toArray(): array
     {
@@ -46,5 +49,13 @@ final readonly class Pagination
             'total_items' => $this->totalItems,
             'total_pages' => $this->totalPages,
         ];
+    }
+
+    /**
+     * @return array{page: int, limit: int, total_items: int, total_pages: int}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

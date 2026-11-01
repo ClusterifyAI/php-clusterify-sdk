@@ -48,7 +48,7 @@ final class InstallationResourceTest extends TestCase
         ]);
 
         $resource = new InstallationResource($mockHttp);
-        $res = $resource->get();
+        $res = $resource->get(hostSystem: 'magento2');
 
         $this->assertTrue($res->success);
         $this->assertSame('78d2c63c-2c11-4d4b-adec-63dbdfb5c60e', $res->publicUuid);
@@ -60,5 +60,6 @@ final class InstallationResourceTest extends TestCase
         $this->assertSame('html', $res->information->availableGuides[0]->platform);
         $this->assertSame('/installation', $res->information->adminGuides->installationPage);
         $this->assertCount(2, $res->information->verificationSteps);
+        $this->assertSame(['host_system' => 'magento2'], $mockHttp->recordedRequests[0]->queryParams);
     }
 }

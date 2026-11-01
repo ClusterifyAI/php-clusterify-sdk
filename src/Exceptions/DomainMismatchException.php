@@ -15,12 +15,14 @@ class DomainMismatchException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'The provided URL domain does not match your registered chatbot domain.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 400
     ) {
-        parent::__construct($message, 'DOMAIN_MISMATCH', 400, $details, $previous);
+        parent::__construct($message, 'DOMAIN_MISMATCH', $statusCode, $details, $previous);
     }
 }

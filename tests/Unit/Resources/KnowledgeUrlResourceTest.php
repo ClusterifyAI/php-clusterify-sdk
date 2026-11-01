@@ -6,9 +6,11 @@ namespace Clusterify\Tests\Unit\Resources;
 
 use Clusterify\DTO\KnowledgeUrl\KnowledgeUrlQuery;
 use Clusterify\DTO\KnowledgeUrl\UpsertUrlRequest;
+use Clusterify\DTO\KnowledgeUrl\UrlStatus;
 use Clusterify\Exceptions\ResourceNotFoundException;
 use Clusterify\Resources\KnowledgeUrlResource;
 use Clusterify\Tests\Mocks\MockHttpClient;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class KnowledgeUrlResourceTest extends TestCase
@@ -45,6 +47,7 @@ final class KnowledgeUrlResourceTest extends TestCase
                     'disabled' => 0,
                     'max_urls' => 1000,
                     'max_content_length' => 20000,
+                    'max_url_address_length' => 2048,
                 ],
                 'chatbot' => [
                     'id' => 50,
@@ -54,7 +57,7 @@ final class KnowledgeUrlResourceTest extends TestCase
         ]);
 
         $resource = new KnowledgeUrlResource($mockHttp);
-        $query = KnowledgeUrlQuery::create()->setPage(1)->setLimit(10)->setStatus('enabled');
+        $query = KnowledgeUrlQuery::create()->setPage(1)->setLimit(10)->setStatus(UrlStatus::Enabled);
         $res = $resource->list($query);
 
         $this->assertTrue($res->success);
@@ -62,7 +65,16 @@ final class KnowledgeUrlResourceTest extends TestCase
         $this->assertSame('https://example.com/pricing', $res->items[0]->url);
         $this->assertSame(1, $res->pagination->page);
         $this->assertSame(1, $res->stats->total);
+        $this->assertSame(2048, $res->stats->maxUrlAddressLength);
         $this->assertSame('https://example.com', $res->chatbot->domain);
+        $this->assertSame(['page' => 1, 'limit' => 10, 'status' => 'enabled'], $mockHttp->recordedRequests[0]->queryParams);
+    }
+
+    public function testQueryThrowsOnInvalidStatusString(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        /** @phpstan-ignore argument.type */
+        KnowledgeUrlQuery::create()->setStatus('archived');
     }
 
     public function testGetById(): void
@@ -145,6 +157,7 @@ final class KnowledgeUrlResourceTest extends TestCase
                     'disabled' => 3,
                     'max_urls' => 1000,
                     'max_content_length' => 20000,
+                    'max_url_address_length' => 2048,
                 ],
             ],
         ]);
@@ -155,9 +168,10 @@ final class KnowledgeUrlResourceTest extends TestCase
         $this->assertSame(15, $stats->total);
         $this->assertSame(12, $stats->enabled);
         $this->assertSame(3, $stats->disabled);
+        $this->assertSame(2048, $stats->maxUrlAddressLength);
     }
 
-    public function testUpsert(): void
+    public function testUpsertAndEditById(): void
     {
         $mockHttp = new MockHttpClient();
         $mockHttp->stub('POST', '/v1/dashboard/knowledge-url', [
@@ -174,10 +188,14 @@ final class KnowledgeUrlResourceTest extends TestCase
         ]);
 
         $resource = new KnowledgeUrlResource($mockHttp);
-        $item = $resource->upsert('https://example.com/pricing', '# Pricing');
+        $item = $resource->upsert(new UpsertUrlRequest('https://example.com/pricing', '# Pricing', true, 42));
 
         $this->assertSame(42, $item->id);
-        $this->assertSame('https://example.com/pricing', $item->url);
+        $this->assertSame(42, $mockHttp->recordedRequests[0]->body['id'] ?? null);
+
+        $updated = $resource->update(42, content: '# Updated Pricing');
+        $this->assertSame(42, $updated->id);
+        $this->assertSame(['id' => 42, 'content' => '# Updated Pricing'], $mockHttp->recordedRequests[1]->body);
     }
 
     public function testBatchUpsert(): void
@@ -216,12 +234,11 @@ final class KnowledgeUrlResourceTest extends TestCase
         $this->assertSame('updated', $batch->results[1]->action);
     }
 
-    public function testAutoPaginate(): void
+    public function testAutoPaginateAcrossMultiplePages(): void
     {
         $mockHttp = new MockHttpClient();
 
-        // Page 1
-        $mockHttp->stub('GET', '/v1/dashboard/knowledge-url', [
+        $mockHttp->queueStub('GET', '/v1/dashboard/knowledge-url', [
             'success' => true,
             'data' => [
                 'items' => [
@@ -231,17 +248,23 @@ final class KnowledgeUrlResourceTest extends TestCase
             ],
         ]);
 
+        $mockHttp->queueStub('GET', '/v1/dashboard/knowledge-url', [
+            'success' => true,
+            'data' => [
+                'items' => [
+                    ['id' => 2, 'url' => 'https://example.com/2', 'content' => '2', 'is_enabled' => true, 'has_embedding' => false],
+                ],
+                'pagination' => ['page' => 2, 'limit' => 1, 'total_items' => 2, 'total_pages' => 2],
+            ],
+        ]);
+
         $resource = new KnowledgeUrlResource($mockHttp);
-        $generator = $resource->autoPaginate(['limit' => 1]);
+        $items = iterator_to_array($resource->autoPaginate(['limit' => 1]));
 
-        $items = [];
-        foreach ($generator as $item) {
-            $items[] = $item;
-            break; // Stop after first to test generator yield
-        }
-
-        $this->assertCount(1, $items);
+        $this->assertCount(2, $items);
         $this->assertSame(1, $items[0]->id);
+        $this->assertSame(2, $items[1]->id);
+        $this->assertCount(2, $mockHttp->recordedRequests);
     }
 
     public function testDelete(): void
@@ -268,5 +291,12 @@ final class KnowledgeUrlResourceTest extends TestCase
             'ids' => [42],
             'urls' => ['https://example.com/old'],
         ], $mockHttp->recordedRequests[0]->body);
+    }
+
+    public function testBulkDeleteThrowsWhenBothIdsAndUrlsEmpty(): void
+    {
+        $resource = new KnowledgeUrlResource(new MockHttpClient());
+        $this->expectException(InvalidArgumentException::class);
+        $resource->bulkDelete();
     }
 }

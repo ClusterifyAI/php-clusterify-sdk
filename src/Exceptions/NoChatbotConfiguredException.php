@@ -15,12 +15,14 @@ class NoChatbotConfiguredException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'No chatbot configured for this account. Please set up a chatbot domain in the dashboard.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 400
     ) {
-        parent::__construct($message, 'NO_CHATBOT_CONFIGURED', 400, $details, $previous);
+        parent::__construct($message, 'NO_CHATBOT_CONFIGURED', $statusCode, $details, $previous);
     }
 }

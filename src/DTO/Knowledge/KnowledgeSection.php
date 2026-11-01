@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Knowledge;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Single simple website knowledge base section.
  */
-final readonly class KnowledgeSection
+final readonly class KnowledgeSection implements JsonSerializable
 {
     /**
      * @param string $id Unique section identifier (e.g. 'kb_1700000000_abcde')
@@ -29,19 +32,21 @@ final readonly class KnowledgeSection
      */
     public static function fromArray(array $data): self
     {
-        $isOpen = $data['isOpen'] ?? $data['is_open'] ?? true;
+        $isOpen = array_key_exists('isOpen', $data)
+            ? Payload::bool($data, 'isOpen', true)
+            : Payload::bool($data, 'is_open', true);
 
         return new self(
-            id: (string) ($data['id'] ?? ''),
-            position: (int) ($data['position'] ?? 0),
-            title: (string) ($data['title'] ?? ''),
-            content: (string) ($data['content'] ?? ''),
-            isOpen: (bool) $isOpen
+            id: Payload::string($data, 'id', ''),
+            position: Payload::int($data, 'position', 0),
+            title: Payload::string($data, 'title', ''),
+            content: Payload::string($data, 'content', ''),
+            isOpen: $isOpen
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{id: string, position: int, title: string, content: string, isOpen: bool}
      */
     public function toArray(): array
     {
@@ -52,5 +57,13 @@ final readonly class KnowledgeSection
             'content' => $this->content,
             'isOpen' => $this->isOpen,
         ];
+    }
+
+    /**
+     * @return array{id: string, position: int, title: string, content: string, isOpen: bool}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

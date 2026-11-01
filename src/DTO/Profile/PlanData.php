@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Profile;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Tenant subscription plan details and capabilities.
  */
-final readonly class PlanData
+final readonly class PlanData implements JsonSerializable
 {
     /**
      * @param int $id Plan level ID (1: Starter, 2: Professional)
@@ -27,19 +30,23 @@ final readonly class PlanData
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $restrictionsData */
-        $restrictionsData = $data['restrictions'] ?? [];
+        $restrictionsData = Payload::map($data, 'restrictions');
 
         return new self(
-            id: (int) ($data['id'] ?? 1),
-            name: (string) ($data['name'] ?? 'Starter Plan'),
-            isUrlKnowledgeAllowed: (bool) ($data['is_url_knowledge_allowed'] ?? false),
+            id: Payload::int($data, 'id', 1),
+            name: Payload::string($data, 'name', 'Starter Plan'),
+            isUrlKnowledgeAllowed: Payload::bool($data, 'is_url_knowledge_allowed', false),
             restrictions: PlanRestrictions::fromArray($restrictionsData)
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     id: int,
+     *     name: string,
+     *     is_url_knowledge_allowed: bool,
+     *     restrictions: array<string, int>
+     * }
      */
     public function toArray(): array
     {
@@ -49,5 +56,13 @@ final readonly class PlanData
             'is_url_knowledge_allowed' => $this->isUrlKnowledgeAllowed,
             'restrictions' => $this->restrictions->toArray(),
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

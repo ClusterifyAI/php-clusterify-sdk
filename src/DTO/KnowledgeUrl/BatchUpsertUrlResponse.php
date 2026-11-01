@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Dedicated response envelope for batch URL knowledge upsert operations.
  */
-final readonly class BatchUpsertUrlResponse
+final readonly class BatchUpsertUrlResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded overall
@@ -31,29 +34,26 @@ final readonly class BatchUpsertUrlResponse
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
+        $dataNode = Payload::unwrapData($data);
 
-        /** @var list<array<string, mixed>> $rawResults */
-        $rawResults = $dataNode['results'] ?? [];
-        $results = array_values(array_map(
+        $rawResults = Payload::listOfMaps($dataNode, 'results');
+        $results = array_map(
             static fn(array $res): BatchUpsertResultItem => BatchUpsertResultItem::fromArray($res),
             $rawResults
-        ));
+        );
 
-        /** @var list<array<string, mixed>> $rawErrors */
-        $rawErrors = $dataNode['errors'] ?? [];
-        $errors = array_values(array_map(
+        $rawErrors = Payload::listOfMaps($dataNode, 'errors');
+        $errors = array_map(
             static fn(array $err): BatchUpsertErrorItem => BatchUpsertErrorItem::fromArray($err),
             $rawErrors
-        ));
+        );
 
-        $msg = isset($data['message']) && is_string($data['message']) ? $data['message'] : null;
+        $msg = Payload::nullableString($data, 'message');
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
-            processed: (int) ($dataNode['processed'] ?? count($results)),
-            errorsCount: (int) ($dataNode['errors_count'] ?? count($errors)),
+            success: Payload::bool($data, 'success', true),
+            processed: Payload::nullableInt($dataNode, 'processed') ?? count($results),
+            errorsCount: Payload::nullableInt($dataNode, 'errors_count') ?? count($errors),
             results: $results,
             errors: $errors,
             message: $msg
@@ -61,7 +61,16 @@ final readonly class BatchUpsertUrlResponse
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     success: bool,
+     *     message: string|null,
+     *     data: array{
+     *         processed: int,
+     *         errors_count: int,
+     *         results: list<array<string, mixed>>,
+     *         errors: list<array{index: int, url: string, error: string}>
+     *     }
+     * }
      */
     public function toArray(): array
     {
@@ -75,5 +84,13 @@ final readonly class BatchUpsertUrlResponse
                 'errors' => array_map(static fn(BatchUpsertErrorItem $e): array => $e->toArray(), $this->errors),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

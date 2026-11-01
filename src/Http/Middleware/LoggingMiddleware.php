@@ -18,6 +18,7 @@ final readonly class LoggingMiddleware implements MiddlewareInterface
         'x-secret-key',
         'x-api-secret',
         'authorization',
+        'proxy-authorization',
     ];
 
     public function __construct(
@@ -27,11 +28,12 @@ final readonly class LoggingMiddleware implements MiddlewareInterface
     public function handle(Request $request, callable $next): Response
     {
         $startTime = microtime(true);
+        $combinedHeaders = array_merge($request->headers, $request->options?->headers ?? []);
         $context = [
             'method' => $request->method,
             'path' => $request->path,
             'query' => $request->queryParams,
-            'headers' => $this->sanitizeHeaders($request->headers),
+            'headers' => $this->sanitizeHeaders($combinedHeaders),
         ];
 
         $this->logger->debug("Clusterify API Request: {$request->method} {$request->path}", $context);

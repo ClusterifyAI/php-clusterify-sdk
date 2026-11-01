@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Chatbot;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Visual styling and widget popup settings for the chatbot.
  */
-final readonly class ChatbotDetails
+final readonly class ChatbotDetails implements JsonSerializable
 {
     /**
      * @param string $title Chatbot popup window title (e.g. 'AI Assistant')
@@ -28,15 +31,15 @@ final readonly class ChatbotDetails
     public static function fromArray(array $data): self
     {
         return new self(
-            title: (string) ($data['title'] ?? 'AI Assistant'),
-            headerBgColor: (string) ($data['header_bg_color'] ?? '#222222'),
-            headerTextColor: (string) ($data['header_text_color'] ?? '#ffffff'),
-            popupRadius: (string) ($data['popup_radius'] ?? '15')
+            title: Payload::string($data, 'title', 'AI Assistant'),
+            headerBgColor: Payload::string($data, 'header_bg_color', '#222222'),
+            headerTextColor: Payload::string($data, 'header_text_color', '#ffffff'),
+            popupRadius: Payload::string($data, 'popup_radius', '15')
         );
     }
 
     /**
-     * @return array<string, string>
+     * @return array{title: string, header_bg_color: string, header_text_color: string, popup_radius: string}
      */
     public function toArray(): array
     {
@@ -46,5 +49,13 @@ final readonly class ChatbotDetails
             'header_text_color' => $this->headerTextColor,
             'popup_radius' => $this->popupRadius,
         ];
+    }
+
+    /**
+     * @return array{title: string, header_bg_color: string, header_text_color: string, popup_radius: string}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

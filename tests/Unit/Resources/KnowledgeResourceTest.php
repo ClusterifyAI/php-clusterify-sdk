@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Clusterify\Tests\Unit\Resources;
 
 use Clusterify\DTO\Knowledge\CreateSectionRequest;
-use Clusterify\DTO\Knowledge\UpdateSectionRequest;
 use Clusterify\Exceptions\ResourceNotFoundException;
 use Clusterify\Resources\KnowledgeResource;
 use Clusterify\Tests\Mocks\MockHttpClient;
+use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class KnowledgeResourceTest extends TestCase
@@ -32,6 +32,7 @@ final class KnowledgeResourceTest extends TestCase
                     'total_sections' => 1,
                     'max_sections' => 25,
                     'max_section_length' => 10000,
+                    'max_section_title_length' => 100,
                     'plan_id' => 2,
                     'plan_name' => 'PROFESSIONAL Plan',
                 ],
@@ -47,6 +48,7 @@ final class KnowledgeResourceTest extends TestCase
         $this->assertSame('Main Context', $res->sections[0]->title);
         $this->assertSame(1, $res->usage->totalSections);
         $this->assertSame(25, $res->usage->maxSections);
+        $this->assertSame(100, $res->usage->maxSectionTitleLength);
         $this->assertSame(['search' => 'Main'], $mockHttp->recordedRequests[0]->queryParams);
     }
 
@@ -115,6 +117,13 @@ final class KnowledgeResourceTest extends TestCase
         $this->assertTrue($section->isOpen);
     }
 
+    public function testCreateThrowsWithoutContentWhenTitleIsString(): void
+    {
+        $resource = new KnowledgeResource(new MockHttpClient());
+        $this->expectException(InvalidArgumentException::class);
+        $resource->create('Return Policy');
+    }
+
     public function testUpdate(): void
     {
         $mockHttp = new MockHttpClient();
@@ -160,6 +169,13 @@ final class KnowledgeResourceTest extends TestCase
         $this->assertSame('Patched Title', $section->title);
         $this->assertSame('PATCH', $mockHttp->recordedRequests[0]->method);
         $this->assertSame('/v1/dashboard/knowledge/kb_123', $mockHttp->recordedRequests[0]->path);
+    }
+
+    public function testPatchThrowsOnEmptyAttributes(): void
+    {
+        $resource = new KnowledgeResource(new MockHttpClient());
+        $this->expectException(InvalidArgumentException::class);
+        $resource->patch('kb_123', []);
     }
 
     public function testToggle(): void
@@ -257,5 +273,12 @@ final class KnowledgeResourceTest extends TestCase
         $resource = new KnowledgeResource($mockHttp);
         $this->assertTrue($resource->bulkDelete(['kb_1', 'kb_2']));
         $this->assertSame(['ids' => ['kb_1', 'kb_2']], $mockHttp->recordedRequests[0]->body);
+    }
+
+    public function testBulkDeleteThrowsOnEmptyIds(): void
+    {
+        $resource = new KnowledgeResource(new MockHttpClient());
+        $this->expectException(InvalidArgumentException::class);
+        $resource->bulkDelete([]);
     }
 }

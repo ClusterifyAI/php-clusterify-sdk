@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Installation;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Direct links to relevant Clusterify dashboard administration pages.
  */
-final readonly class AdminGuides
+final readonly class AdminGuides implements JsonSerializable
 {
     /**
      * @param string $installationPage Installation page route (e.g. '/installation')
@@ -30,16 +33,22 @@ final readonly class AdminGuides
     public static function fromArray(array $data): self
     {
         return new self(
-            installationPage: (string) ($data['installation_page'] ?? '/installation'),
-            chatbotSettingsPage: (string) ($data['chatbot_settings_page'] ?? '/chatbot'),
-            stylingBuilderPage: (string) ($data['styling_builder_page'] ?? '/chatbot-builder'),
-            integrationsPage: (string) ($data['integrations_page'] ?? '/integrations'),
-            apiKeysPage: (string) ($data['api_keys_page'] ?? '/api-key')
+            installationPage: Payload::string($data, 'installation_page', '/installation'),
+            chatbotSettingsPage: Payload::string($data, 'chatbot_settings_page', '/chatbot'),
+            stylingBuilderPage: Payload::string($data, 'styling_builder_page', '/chatbot-builder'),
+            integrationsPage: Payload::string($data, 'integrations_page', '/integrations'),
+            apiKeysPage: Payload::string($data, 'api_keys_page', '/api-key')
         );
     }
 
     /**
-     * @return array<string, string>
+     * @return array{
+     *     installation_page: string,
+     *     chatbot_settings_page: string,
+     *     styling_builder_page: string,
+     *     integrations_page: string,
+     *     api_keys_page: string
+     * }
      */
     public function toArray(): array
     {
@@ -50,5 +59,13 @@ final readonly class AdminGuides
             'integrations_page' => $this->integrationsPage,
             'api_keys_page' => $this->apiKeysPage,
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace Clusterify;
 
 use Clusterify\Auth\AuthMethod;
-use Clusterify\Auth\Credentials;
 use Clusterify\DTO\Ping\PingResponse;
+use Clusterify\Exceptions\ClusterifyException;
 use Clusterify\Http\HttpClientInterface;
-use Clusterify\Http\PsrHttpClient;
 use Clusterify\Http\RequestOptions;
 use Clusterify\Resources\ChatbotResource;
 use Clusterify\Resources\InstallationResource;
@@ -16,6 +15,7 @@ use Clusterify\Resources\KnowledgeResource;
 use Clusterify\Resources\KnowledgeUrlResource;
 use Clusterify\Resources\PingResource;
 use Clusterify\Resources\ProfileResource;
+use SensitiveParameter;
 
 /**
  * Primary client entrypoint for Clusterify.AI Chatbot API.
@@ -49,6 +49,7 @@ class ClusterifyClient
      */
     public static function create(
         string $publicKey,
+        #[SensitiveParameter]
         string $secretKey,
         ?string $baseUrl = null,
         AuthMethod $authMethod = AuthMethod::CustomHeaders
@@ -78,6 +79,7 @@ class ClusterifyClient
      *
      * @param RequestOptions|null $options
      * @return PingResponse
+     * @throws ClusterifyException
      */
     public function ping(?RequestOptions $options = null): PingResponse
     {

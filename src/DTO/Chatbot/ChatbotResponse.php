@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Chatbot;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Chatbot configuration response envelope.
  */
-final readonly class ChatbotResponse
+final readonly class ChatbotResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -23,19 +26,19 @@ final readonly class ChatbotResponse
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
-        /** @var array<string, mixed> $chatbotNode */
-        $chatbotNode = $dataNode['chatbot'] ?? $dataNode;
+        $dataNode = Payload::unwrapData($data);
+        $chatbotNode = array_key_exists('chatbot', $dataNode) && is_array($dataNode['chatbot'])
+            ? Payload::map($dataNode, 'chatbot')
+            : $dataNode;
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
+            success: Payload::bool($data, 'success', true),
             chatbot: ChatbotData::fromArray($chatbotNode)
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{success: bool, data: array{chatbot: array<string, mixed>}}
      */
     public function toArray(): array
     {
@@ -45,5 +48,13 @@ final readonly class ChatbotResponse
                 'chatbot' => $this->chatbot->toArray(),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

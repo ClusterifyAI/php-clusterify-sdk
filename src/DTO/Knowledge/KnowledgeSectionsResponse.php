@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Knowledge;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Response envelope returned by reordering or replacing knowledge sections.
  */
-final readonly class KnowledgeSectionsResponse
+final readonly class KnowledgeSectionsResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -28,20 +31,18 @@ final readonly class KnowledgeSectionsResponse
      */
     public static function fromArray(array $data, ?string $message = null): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
-        /** @var list<array<string, mixed>> $rawSections */
-        $rawSections = $dataNode['sections'] ?? [];
-        $sections = array_values(array_map(
+        $dataNode = Payload::unwrapData($data);
+        $rawSections = Payload::listOfMaps($dataNode, 'sections');
+        $sections = array_map(
             static fn(array $sec): KnowledgeSection => KnowledgeSection::fromArray($sec),
             $rawSections
-        ));
+        );
 
-        $totalSections = isset($dataNode['total_sections']) ? (int) $dataNode['total_sections'] : count($sections);
-        $msg = $message ?? (isset($data['message']) && is_string($data['message']) ? $data['message'] : null);
+        $totalSections = Payload::nullableInt($dataNode, 'total_sections') ?? count($sections);
+        $msg = $message ?? Payload::nullableString($data, 'message');
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
+            success: Payload::bool($data, 'success', true),
             sections: $sections,
             totalSections: $totalSections,
             message: $msg
@@ -49,7 +50,14 @@ final readonly class KnowledgeSectionsResponse
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     success: bool,
+     *     message: string|null,
+     *     data: array{
+     *         sections: list<array{id: string, position: int, title: string, content: string, isOpen: bool}>,
+     *         total_sections: int|null
+     *     }
+     * }
      */
     public function toArray(): array
     {
@@ -61,5 +69,13 @@ final readonly class KnowledgeSectionsResponse
                 'total_sections' => $this->totalSections,
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

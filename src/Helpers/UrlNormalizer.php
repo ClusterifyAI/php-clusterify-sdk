@@ -21,36 +21,63 @@ final class UrlNormalizer
      */
     public static function normalize(string $urlOrPath, string $chatbotDomain): string
     {
-        $cleanDomain = rtrim($chatbotDomain, '/');
-        if (!str_starts_with($cleanDomain, 'http://') && !str_starts_with($cleanDomain, 'https://')) {
+        $cleanDomain = rtrim(trim($chatbotDomain), '/');
+        if ($cleanDomain === '') {
+            throw new InvalidArgumentException("Invalid chatbot domain: {$chatbotDomain}");
+        }
+
+        if (preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*://#', $cleanDomain) === 1) {
+            if (!str_starts_with(strtolower($cleanDomain), 'http://') && !str_starts_with(strtolower($cleanDomain), 'https://')) {
+                throw new InvalidArgumentException("Unsupported URL scheme in chatbot domain: {$chatbotDomain}");
+            }
+        } else {
             $cleanDomain = 'https://' . $cleanDomain;
         }
 
         $parsedDomain = parse_url($cleanDomain);
-        $domainHost = $parsedDomain['host'] ?? '';
+        $domainHost = is_array($parsedDomain) ? ($parsedDomain['host'] ?? '') : '';
+        $domainPort = is_array($parsedDomain) ? ($parsedDomain['port'] ?? null) : null;
 
         if ($domainHost === '') {
             throw new InvalidArgumentException("Invalid chatbot domain: {$chatbotDomain}");
         }
 
         $trimmed = trim($urlOrPath);
+        if ($trimmed === '') {
+            throw new InvalidArgumentException('URL or path must not be empty.');
+        }
 
-        // If relative path
+        // Reject dangerous or non-HTTP schemes (e.g. javascript:, mailto:, ftp://)
+        if (preg_match('#^([a-zA-Z][a-zA-Z0-9+.-]*):(.*)$#', $trimmed, $schemeMatch) === 1) {
+            $scheme = strtolower($schemeMatch[1]);
+            if ($scheme !== 'http' && $scheme !== 'https') {
+                throw new InvalidArgumentException("Unsupported URL scheme '{$scheme}' in '{$urlOrPath}'.");
+            }
+        }
+
+        // Relative path starting with '/'
         if (str_starts_with($trimmed, '/')) {
             return $cleanDomain . $trimmed;
         }
 
-        if (!str_starts_with($trimmed, 'http://') && !str_starts_with($trimmed, 'https://')) {
-            // Treat as relative path
+        // Relative path without scheme
+        if (!str_starts_with(strtolower($trimmed), 'http://') && !str_starts_with(strtolower($trimmed), 'https://')) {
             return $cleanDomain . '/' . $trimmed;
         }
 
-        // Full URL provided - verify host matches
+        // Full HTTP(S) URL provided - verify host and port match
         $parsedUrl = parse_url($trimmed);
-        $urlHost = $parsedUrl['host'] ?? '';
+        $urlHost = is_array($parsedUrl) ? ($parsedUrl['host'] ?? '') : '';
+        $urlPort = is_array($parsedUrl) ? ($parsedUrl['port'] ?? null) : null;
 
-        if (strcasecmp($urlHost, $domainHost) !== 0) {
+        if ($urlHost === '' || strcasecmp($urlHost, $domainHost) !== 0) {
             throw new InvalidArgumentException("URL host '{$urlHost}' does not match registered chatbot domain host '{$domainHost}'.");
+        }
+
+        if ($urlPort !== $domainPort) {
+            $formattedUrlHost = $urlHost . ($urlPort !== null ? ":{$urlPort}" : '');
+            $formattedDomainHost = $domainHost . ($domainPort !== null ? ":{$domainPort}" : '');
+            throw new InvalidArgumentException("URL port '{$formattedUrlHost}' does not match registered chatbot domain '{$formattedDomainHost}'.");
         }
 
         return $trimmed;

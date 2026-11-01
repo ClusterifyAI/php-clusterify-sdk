@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\Installation;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Platform-specific chatbot installation guide.
  */
-final readonly class IntegrationGuide
+final readonly class IntegrationGuide implements JsonSerializable
 {
     /**
      * @param string $platform Platform code identifier (e.g. 'html', 'nextjs', 'wordpress', 'shopify', 'gtm', 'magento2')
@@ -28,15 +31,15 @@ final readonly class IntegrationGuide
     public static function fromArray(array $data): self
     {
         return new self(
-            platform: (string) ($data['platform'] ?? ''),
-            name: (string) ($data['name'] ?? ''),
-            summary: (string) ($data['summary'] ?? ''),
-            docUrl: (string) ($data['doc_url'] ?? '')
+            platform: Payload::string($data, 'platform', ''),
+            name: Payload::string($data, 'name', ''),
+            summary: Payload::string($data, 'summary', ''),
+            docUrl: Payload::string($data, 'doc_url', '')
         );
     }
 
     /**
-     * @return array<string, string>
+     * @return array{platform: string, name: string, summary: string, doc_url: string}
      */
     public function toArray(): array
     {
@@ -46,5 +49,13 @@ final readonly class IntegrationGuide
             'summary' => $this->summary,
             'doc_url' => $this->docUrl,
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

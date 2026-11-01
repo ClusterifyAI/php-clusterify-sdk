@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use Clusterify\Support\Payload;
+use JsonSerializable;
+
 /**
  * Error entry for a failed item in a batch upsert operation.
  */
-final readonly class BatchUpsertErrorItem
+final readonly class BatchUpsertErrorItem implements JsonSerializable
 {
     /**
      * @param int $index Zero-based array index of the failed item
@@ -26,14 +29,14 @@ final readonly class BatchUpsertErrorItem
     public static function fromArray(array $data): self
     {
         return new self(
-            index: (int) ($data['index'] ?? 0),
-            url: (string) ($data['url'] ?? ''),
-            error: (string) ($data['error'] ?? '')
+            index: Payload::int($data, 'index', 0),
+            url: Payload::string($data, 'url', ''),
+            error: Payload::string($data, 'error', '')
         );
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{index: int, url: string, error: string}
      */
     public function toArray(): array
     {
@@ -42,5 +45,13 @@ final readonly class BatchUpsertErrorItem
             'url' => $this->url,
             'error' => $this->error,
         ];
+    }
+
+    /**
+     * @return array{index: int, url: string, error: string}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

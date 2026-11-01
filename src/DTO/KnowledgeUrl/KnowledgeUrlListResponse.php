@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Clusterify\DTO\KnowledgeUrl;
 
 use Clusterify\DTO\Common\Pagination;
+use Clusterify\Support\Payload;
+use JsonSerializable;
 
 /**
  * URL knowledge base listing response envelope containing items, pagination, stats, and chatbot info.
  */
-final readonly class KnowledgeUrlListResponse
+final readonly class KnowledgeUrlListResponse implements JsonSerializable
 {
     /**
      * @param bool $success Whether the request succeeded
@@ -31,29 +33,24 @@ final readonly class KnowledgeUrlListResponse
      */
     public static function fromArray(array $data): self
     {
-        /** @var array<string, mixed> $dataNode */
-        $dataNode = $data['data'] ?? $data;
-        /** @var list<array<string, mixed>> $rawItems */
-        $rawItems = $dataNode['items'] ?? [];
-        $items = array_values(array_map(
+        $dataNode = Payload::unwrapData($data);
+        $rawItems = Payload::listOfMaps($dataNode, 'items');
+        $items = array_map(
             static fn(array $item): KnowledgeUrlItem => KnowledgeUrlItem::fromArray($item),
             $rawItems
-        ));
+        );
 
-        /** @var array<string, mixed> $paginationNode */
-        $paginationNode = $dataNode['pagination'] ?? [];
+        $paginationNode = Payload::map($dataNode, 'pagination');
         $pagination = Pagination::fromArray($paginationNode);
 
-        /** @var array<string, mixed> $statsNode */
-        $statsNode = $dataNode['stats'] ?? [];
+        $statsNode = Payload::map($dataNode, 'stats');
         $stats = KnowledgeUrlStats::fromArray($statsNode);
 
-        /** @var array<string, mixed> $chatbotNode */
-        $chatbotNode = $dataNode['chatbot'] ?? [];
+        $chatbotNode = Payload::map($dataNode, 'chatbot');
         $chatbot = KnowledgeUrlChatbot::fromArray($chatbotNode);
 
         return new self(
-            success: (bool) ($data['success'] ?? true),
+            success: Payload::bool($data, 'success', true),
             items: $items,
             pagination: $pagination,
             stats: $stats,
@@ -62,7 +59,15 @@ final readonly class KnowledgeUrlListResponse
     }
 
     /**
-     * @return array<string, mixed>
+     * @return array{
+     *     success: bool,
+     *     data: array{
+     *         items: list<array<string, mixed>>,
+     *         pagination: array{page: int, limit: int, total_items: int, total_pages: int},
+     *         stats: array<string, int>,
+     *         chatbot: array{id: int, domain: string}
+     *     }
+     * }
      */
     public function toArray(): array
     {
@@ -75,5 +80,13 @@ final readonly class KnowledgeUrlListResponse
                 'chatbot' => $this->chatbot->toArray(),
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }

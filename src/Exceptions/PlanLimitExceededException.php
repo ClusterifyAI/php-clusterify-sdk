@@ -15,12 +15,14 @@ class PlanLimitExceededException extends ClientException
      * @param string $message
      * @param array<string, mixed> $details
      * @param Throwable|null $previous
+     * @param int $statusCode
      */
     public function __construct(
         string $message = 'Plan limit exceeded. You have reached the maximum number of items allowed on your plan.',
         array $details = [],
-        ?Throwable $previous = null
+        ?Throwable $previous = null,
+        int $statusCode = 400
     ) {
-        parent::__construct($message, 'PLAN_LIMIT_EXCEEDED', 400, $details, $previous);
+        parent::__construct($message, 'PLAN_LIMIT_EXCEEDED', $statusCode, $details, $previous);
     }
 }

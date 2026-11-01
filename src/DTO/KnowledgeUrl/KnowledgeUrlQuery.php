@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use InvalidArgumentException;
+use JsonSerializable;
+
 /**
  * Fluent query parameters builder for filtering and paginating URL knowledge records.
  */
-final class KnowledgeUrlQuery
+final class KnowledgeUrlQuery implements JsonSerializable
 {
     private ?int $page = null;
     private ?int $limit = null;
@@ -41,11 +44,23 @@ final class KnowledgeUrlQuery
     }
 
     /**
-     * @param string $status Filter by 'all', 'enabled', or 'disabled'
+     * @param UrlStatus|'all'|'enabled'|'disabled' $status Filter by 'all', 'enabled', or 'disabled'
+     * @throws InvalidArgumentException
      */
-    public function setStatus(string $status): self
+    public function setStatus(UrlStatus|string $status): self
     {
-        $this->status = $status;
+        if ($status instanceof UrlStatus) {
+            $this->status = $status->value;
+            return $this;
+        }
+
+        $normalized = strtolower(trim($status));
+        $parsed = UrlStatus::tryFrom($normalized);
+        if ($parsed === null) {
+            throw new InvalidArgumentException("Invalid status filter '{$status}'. Expected 'all', 'enabled', or 'disabled'.");
+        }
+
+        $this->status = $parsed->value;
         return $this;
     }
 
@@ -88,7 +103,7 @@ final class KnowledgeUrlQuery
     /**
      * Convert query parameters into an associative array for HTTP requests.
      *
-     * @return array<string, mixed>
+     * @return array<string, int|string>
      */
     public function toQueryParams(): array
     {
@@ -123,5 +138,13 @@ final class KnowledgeUrlQuery
         }
 
         return $params;
+    }
+
+    /**
+     * @return array<string, int|string>
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toQueryParams();
     }
 }

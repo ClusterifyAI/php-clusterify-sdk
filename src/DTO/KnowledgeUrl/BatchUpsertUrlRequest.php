@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Clusterify\DTO\KnowledgeUrl;
 
+use Clusterify\Support\Payload;
 use InvalidArgumentException;
+use JsonSerializable;
 
 /**
  * Payload for batch upserting multiple URL knowledge entries.
  */
-final readonly class BatchUpsertUrlRequest
+final readonly class BatchUpsertUrlRequest implements JsonSerializable
 {
     /**
      * @param list<UpsertUrlRequest> $items
@@ -17,7 +19,7 @@ final readonly class BatchUpsertUrlRequest
     public function __construct(
         public array $items
     ) {
-        if (empty($this->items)) {
+        if ($this->items === []) {
             throw new InvalidArgumentException('BatchUpsertUrlRequest items array cannot be empty.');
         }
     }
@@ -36,9 +38,10 @@ final readonly class BatchUpsertUrlRequest
                 $normalized[] = $item;
             } elseif (is_array($item)) {
                 $normalized[] = new UpsertUrlRequest(
-                    url: (string) ($item['url'] ?? ''),
-                    content: (string) ($item['content'] ?? ''),
-                    isEnabled: (bool) ($item['is_enabled'] ?? true)
+                    url: Payload::string($item, 'url', ''),
+                    content: Payload::string($item, 'content', ''),
+                    isEnabled: Payload::bool($item, 'is_enabled', true),
+                    id: Payload::nullableInt($item, 'id')
                 );
             }
         }
@@ -47,12 +50,20 @@ final readonly class BatchUpsertUrlRequest
     }
 
     /**
-     * @return array<string, list<array<string, mixed>>>
+     * @return array{items: list<array<string, int|string|bool>>}
      */
     public function toArray(): array
     {
         return [
             'items' => array_map(static fn(UpsertUrlRequest $item): array => $item->toArray(), $this->items),
         ];
+    }
+
+    /**
+     * @return array{items: list<array<string, int|string|bool>>}
+     */
+    public function jsonSerialize(): array
+    {
+        return $this->toArray();
     }
 }
